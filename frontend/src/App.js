@@ -803,6 +803,8 @@ const DateFilter = ({ startDate, endDate, onDateChange }) => {
 function App() {
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({});
+  const [chartData, setChartData] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
@@ -815,6 +817,9 @@ function App() {
       
       const response = await axios.get(`${API}/transactions?${params}`);
       setTransactions(response.data);
+      
+      // Reset to first page when data changes
+      setCurrentPage(1);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     }
@@ -833,6 +838,19 @@ function App() {
     }
   };
 
+  const fetchChartData = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      const response = await axios.get(`${API}/transactions/chart-data?${params}`);
+      setChartData(response.data);
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    }
+  };
+
   const handleDateChange = (type, value) => {
     if (type === 'clear') {
       setStartDate('');
@@ -845,7 +863,7 @@ function App() {
   };
 
   const handleDeleteTransaction = async (transactionId) => {
-    if (window.confirm('Are you sure you want to delete this transaction?')) {
+    if (window.confirm('⚠️ Are you sure you want to permanently delete this transaction? This action cannot be undone.')) {
       try {
         await axios.delete(`${API}/transactions/${transactionId}`);
         fetchData();
@@ -856,9 +874,18 @@ function App() {
     }
   };
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    // Scroll to top of transaction list
+    window.scrollTo({ 
+      top: document.querySelector('.transaction-list-container')?.offsetTop || 0, 
+      behavior: 'smooth' 
+    });
+  };
+
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchTransactions(), fetchSummary()]);
+    await Promise.all([fetchTransactions(), fetchSummary(), fetchChartData()]);
     setLoading(false);
   };
 
@@ -870,8 +897,9 @@ function App() {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your balance sheet...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading your balance sheet...</p>
+          <p className="text-gray-500 text-sm mt-2">Fetching transactions and financial data</p>
         </div>
       </div>
     );
@@ -880,29 +908,95 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="container mx-auto px-4 py-8">
+        {/* Header Section */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Business Balance Sheet
+            📊 Business Balance Sheet
           </h1>
           <p className="text-lg text-gray-600">
-            Track your business income, expenses, and profit/loss
+            Track your business income, expenses, and profit/loss with detailed analytics
           </p>
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
+            <p className="text-blue-800 text-sm">
+              💾 <strong>Permanent Records:</strong> All transactions are saved forever unless manually deleted by you.
+              Your financial history is preserved for lifetime access and tax purposes.
+            </p>
+          </div>
         </div>
 
+        {/* Summary Cards */}
         <SummaryCards summary={summary} />
-        
-        <DateFilter 
-          startDate={startDate}
-          endDate={endDate}
-          onDateChange={handleDateChange}
-        />
 
+        {/* Interactive Charts */}
+        <InteractiveCharts chartData={chartData} summary={summary} />
+        
+        {/* Date Filter and PDF Download */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            {/* Date Filter */}
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold mb-4 text-gray-800">📅 Filter & Export</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleDateChange('startDate', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => handleDateChange('endDate', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={() => handleDateChange('clear', '')}
+                    className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PDF Download */}
+            <div className="lg:flex-shrink-0">
+              <PDFDownload 
+                transactions={transactions}
+                summary={summary}
+                startDate={startDate}
+                endDate={endDate}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Transaction Form */}
         <TransactionForm onTransactionAdded={fetchData} />
 
-        <TransactionList 
-          transactions={transactions}
-          onDelete={handleDeleteTransaction}
-        />
+        {/* Transaction List with Pagination */}
+        <div className="transaction-list-container">
+          <TransactionList 
+            transactions={transactions}
+            onDelete={handleDeleteTransaction}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
+        </div>
       </div>
     </div>
   );
