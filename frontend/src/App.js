@@ -534,48 +534,99 @@ const SummaryCards = ({ summary }) => {
   );
 };
 
-// Transaction List Component
-const TransactionList = ({ transactions, onDelete }) => {
+// Transaction List Component with Pagination
+const TransactionList = ({ transactions, onDelete, currentPage, onPageChange }) => {
+  const TRANSACTIONS_PER_PAGE = 20;
+  const totalPages = Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE);
+  
+  // Calculate paginated transactions
+  const startIndex = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+  const endIndex = startIndex + TRANSACTIONS_PER_PAGE;
+  const paginatedTransactions = transactions.slice(startIndex, endIndex);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Recent Transactions</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Transaction History</h2>
+        <div className="text-sm text-gray-600">
+          Showing {startIndex + 1}-{Math.min(endIndex, transactions.length)} of {transactions.length} transactions
+        </div>
+      </div>
       
       {transactions.length === 0 ? (
         <p className="text-gray-500 text-center py-8">No transactions found. Add your first transaction above!</p>
       ) : (
-        <div className="space-y-3">
-          {transactions.map((transaction) => (
-            <div
-              key={transaction.id}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    transaction.type === 'income'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {transaction.type === 'income' ? '+' : '-'}
-                    ${transaction.amount.toFixed(2)}
-                  </span>
-                  <span className="font-medium text-gray-900">{transaction.description}</span>
-                  {transaction.category && (
-                    <span className="text-sm text-gray-500">({transaction.category})</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 mt-1">{transaction.date}</p>
-              </div>
-              
-              <button
-                onClick={() => onDelete(transaction.id)}
-                className="text-red-600 hover:text-red-800 font-medium text-sm"
+        <>
+          <div className="space-y-3 mb-6">
+            {paginatedTransactions.map((transaction) => (
+              <div
+                key={transaction.id}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      transaction.type === 'income'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : '-'}
+                      ${transaction.amount.toFixed(2)}
+                    </span>
+                    <span className="font-medium text-gray-900">{transaction.description}</span>
+                    {transaction.category && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                        {transaction.category}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>{transaction.date}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a2 2 0 012-2z" />
+                      </svg>
+                      <span className="capitalize">{transaction.type}</span>
+                    </div>
+                    
+                    {transaction.created_at && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Added: {format(new Date(transaction.created_at), 'MMM dd, HH:mm')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => onDelete(transaction.id)}
+                  className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg font-medium text-sm transition-colors"
+                  title="Delete transaction"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination Component */}
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
+        </>
       )}
     </div>
   );
