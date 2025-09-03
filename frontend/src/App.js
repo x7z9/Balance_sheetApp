@@ -180,6 +180,173 @@ const PDFDownload = ({ transactions, summary, startDate, endDate }) => {
     </button>
   );
 };
+
+// Interactive Charts Component
+const InteractiveCharts = ({ chartData, summary }) => {
+  const [chartType, setChartType] = useState('line');
+
+  // Prepare data for charts
+  const prepareChartData = () => {
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+      return [];
+    }
+
+    return chartData.labels.map((date, index) => ({
+      date: format(new Date(date), 'MMM dd'),
+      fullDate: date,
+      income: chartData.income[index] || 0,
+      expenses: chartData.expenses[index] || 0,
+      netProfit: chartData.net_profit[index] || 0
+    }));
+  };
+
+  const data = prepareChartData();
+
+  if (data.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">Financial Trends</h2>
+        <div className="text-center py-8">
+          <p className="text-gray-500">No data available for chart visualization. Add some transactions to see trends!</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Financial Trends</h2>
+        
+        {/* Chart Type Selector */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setChartType('line')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              chartType === 'line'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Line Chart
+          </button>
+          <button
+            onClick={() => setChartType('bar')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              chartType === 'bar'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Bar Chart
+          </button>
+        </div>
+      </div>
+
+      <div className="h-96">
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === 'line' ? (
+            <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => `$${value}`}
+              />
+              <Tooltip 
+                formatter={(value, name) => [`$${value.toFixed(2)}`, name]}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="income" 
+                stroke="#10b981" 
+                strokeWidth={3}
+                name="Income"
+                dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="expenses" 
+                stroke="#ef4444" 
+                strokeWidth={3}
+                name="Expenses"
+                dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="netProfit" 
+                stroke="#3b82f6" 
+                strokeWidth={3}
+                name="Net Profit"
+                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+              />
+            </LineChart>
+          ) : (
+            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => `$${value}`}
+              />
+              <Tooltip 
+                formatter={(value, name) => [`$${value.toFixed(2)}`, name]}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Legend />
+              <Bar dataKey="income" fill="#10b981" name="Income" />
+              <Bar dataKey="expenses" fill="#ef4444" name="Expenses" />
+              <Bar dataKey="netProfit" fill="#3b82f6" name="Net Profit" />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+
+      {/* Chart Statistics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Avg Daily Income</p>
+          <p className="text-lg font-semibold text-green-600">
+            ${data.length > 0 ? (data.reduce((sum, d) => sum + d.income, 0) / data.length).toFixed(2) : '0.00'}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Avg Daily Expenses</p>
+          <p className="text-lg font-semibold text-red-600">
+            ${data.length > 0 ? (data.reduce((sum, d) => sum + d.expenses, 0) / data.length).toFixed(2) : '0.00'}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Best Day Profit</p>
+          <p className="text-lg font-semibold text-blue-600">
+            ${data.length > 0 ? Math.max(...data.map(d => d.netProfit)).toFixed(2) : '0.00'}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Days Tracked</p>
+          <p className="text-lg font-semibold text-gray-600">
+            {data.length}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const TransactionForm = ({ onTransactionAdded }) => {
   const [formData, setFormData] = useState({
     type: 'income',
