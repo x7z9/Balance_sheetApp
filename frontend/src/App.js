@@ -1,52 +1,395 @@
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import axios from "axios";
+import { format } from "date-fns";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const Home = () => {
-  const helloWorldApi = async () => {
+// Transaction Form Component
+const TransactionForm = ({ onTransactionAdded }) => {
+  const [formData, setFormData] = useState({
+    type: 'income',
+    amount: '',
+    description: '',
+    category: '',
+    date: format(new Date(), 'yyyy-MM-dd')
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
     try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+      const submitData = {
+        ...formData,
+        amount: parseFloat(formData.amount)
+      };
+      
+      await axios.post(`${API}/transactions`, submitData);
+      
+      // Reset form
+      setFormData({
+        type: 'income',
+        amount: '',
+        description: '',
+        category: '',
+        date: format(new Date(), 'yyyy-MM-dd')
+      });
+      
+      onTransactionAdded();
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      alert('Error adding transaction. Please try again.');
     }
+    
+    setIsSubmitting(false);
   };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  const setTransactionType = (type) => {
+    setFormData({ ...formData, type });
+  };
 
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">Add Transaction</h2>
+      
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Transaction Type Buttons */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setTransactionType('income')}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${
+              formData.type === 'income'
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            + Income/Profit
+          </button>
+          <button
+            type="button"
+            onClick={() => setTransactionType('expense')}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${
+              formData.type === 'expense'
+                ? 'bg-red-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            - Expenses/Spending
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Amount
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter amount"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Date
+            </label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
+          <input
+            type="text"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter description"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Category (Optional)
+          </label>
+          <input
+            type="text"
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter category"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
+          {isSubmitting ? 'Adding...' : 'Add Transaction'}
+        </button>
+      </form>
     </div>
   );
 };
 
-function App() {
+// Summary Cards Component
+const SummaryCards = ({ summary }) => {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="bg-green-100 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-green-800">Total Income</h3>
+        <p className="text-2xl font-bold text-green-600">
+          ${summary.total_income?.toFixed(2) || '0.00'}
+        </p>
+      </div>
+      
+      <div className="bg-red-100 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-red-800">Total Expenses</h3>
+        <p className="text-2xl font-bold text-red-600">
+          ${summary.total_expenses?.toFixed(2) || '0.00'}
+        </p>
+      </div>
+      
+      <div className={`rounded-lg p-6 ${
+        (summary.net_profit || 0) >= 0 ? 'bg-blue-100' : 'bg-orange-100'
+      }`}>
+        <h3 className={`text-lg font-semibold ${
+          (summary.net_profit || 0) >= 0 ? 'text-blue-800' : 'text-orange-800'
+        }`}>
+          Net Profit/Loss
+        </h3>
+        <p className={`text-2xl font-bold ${
+          (summary.net_profit || 0) >= 0 ? 'text-blue-600' : 'text-orange-600'
+        }`}>
+          ${summary.net_profit?.toFixed(2) || '0.00'}
+        </p>
+      </div>
+      
+      <div className="bg-gray-100 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-800">Total Transactions</h3>
+        <p className="text-2xl font-bold text-gray-600">
+          {summary.transaction_count || 0}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Transaction List Component
+const TransactionList = ({ transactions, onDelete }) => {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">Recent Transactions</h2>
+      
+      {transactions.length === 0 ? (
+        <p className="text-gray-500 text-center py-8">No transactions found. Add your first transaction above!</p>
+      ) : (
+        <div className="space-y-3">
+          {transactions.map((transaction) => (
+            <div
+              key={transaction.id}
+              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    transaction.type === 'income'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {transaction.type === 'income' ? '+' : '-'}
+                    ${transaction.amount.toFixed(2)}
+                  </span>
+                  <span className="font-medium text-gray-900">{transaction.description}</span>
+                  {transaction.category && (
+                    <span className="text-sm text-gray-500">({transaction.category})</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{transaction.date}</p>
+              </div>
+              
+              <button
+                onClick={() => onDelete(transaction.id)}
+                className="text-red-600 hover:text-red-800 font-medium text-sm"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Date Filter Component
+const DateFilter = ({ startDate, endDate, onDateChange }) => {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">Filter by Date Range</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Start Date
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onDateChange('startDate', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            End Date
+          </label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => onDateChange('endDate', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="flex items-end">
+          <button
+            onClick={() => onDateChange('clear', '')}
+            className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main App Component
+function App() {
+  const [transactions, setTransactions] = useState([]);
+  const [summary, setSummary] = useState({});
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const fetchTransactions = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      const response = await axios.get(`${API}/transactions?${params}`);
+      setTransactions(response.data);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      const response = await axios.get(`${API}/transactions/summary?${params}`);
+      setSummary(response.data);
+    } catch (error) {
+      console.error('Error fetching summary:', error);
+    }
+  };
+
+  const handleDateChange = (type, value) => {
+    if (type === 'clear') {
+      setStartDate('');
+      setEndDate('');
+    } else if (type === 'startDate') {
+      setStartDate(value);
+    } else if (type === 'endDate') {
+      setEndDate(value);
+    }
+  };
+
+  const handleDeleteTransaction = async (transactionId) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      try {
+        await axios.delete(`${API}/transactions/${transactionId}`);
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+        alert('Error deleting transaction. Please try again.');
+      }
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    await Promise.all([fetchTransactions(), fetchSummary()]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [startDate, endDate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your balance sheet...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Business Balance Sheet
+          </h1>
+          <p className="text-lg text-gray-600">
+            Track your business income, expenses, and profit/loss
+          </p>
+        </div>
+
+        <SummaryCards summary={summary} />
+        
+        <DateFilter 
+          startDate={startDate}
+          endDate={endDate}
+          onDateChange={handleDateChange}
+        />
+
+        <TransactionForm onTransactionAdded={fetchData} />
+
+        <TransactionList 
+          transactions={transactions}
+          onDelete={handleDeleteTransaction}
+        />
+      </div>
     </div>
   );
 }
