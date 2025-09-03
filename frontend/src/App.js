@@ -72,112 +72,235 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   );
 };
 
-// PDF Download Component
+// Enhanced PDF Download Component
 const PDFDownload = ({ transactions, summary, startDate, endDate }) => {
   const generatePDF = () => {
     const doc = new jsPDF();
     
-    // Header
-    doc.setFontSize(20);
+    // Header with Company/Business Info
+    doc.setFontSize(24);
     doc.setTextColor(40);
     doc.text('Business Balance Sheet Report', 20, 25);
     
-    // Date range
+    // Subtitle and date range
     doc.setFontSize(12);
     doc.setTextColor(100);
     const dateRange = startDate && endDate 
       ? `Period: ${startDate} to ${endDate}`
       : startDate 
-      ? `From: ${startDate}`
+      ? `From: ${startDate} onwards`
       : endDate 
       ? `Until: ${endDate}`
-      : `All Transactions (Generated: ${format(new Date(), 'yyyy-MM-dd')})`;
+      : `Complete Transaction History`;
     doc.text(dateRange, 20, 35);
+    doc.text(`Generated: ${format(new Date(), 'MMMM dd, yyyy at HH:mm')}`, 20, 42);
     
-    // Summary Section
-    doc.setFontSize(14);
+    // Financial Summary Section
+    doc.setFontSize(16);
     doc.setTextColor(40);
-    doc.text('Financial Summary', 20, 50);
+    doc.text('📊 Financial Summary', 20, 58);
     
-    doc.setFontSize(10);
-    doc.setTextColor(100);
     const summaryData = [
-      ['Total Income', `$${summary.total_income?.toFixed(2) || '0.00'}`],
-      ['Total Expenses', `$${summary.total_expenses?.toFixed(2) || '0.00'}`],
-      ['Net Profit/Loss', `$${summary.net_profit?.toFixed(2) || '0.00'}`],
-      ['Total Transactions', `${summary.transaction_count || 0}`]
+      ['Total Income', `$${summary.total_income?.toFixed(2) || '0.00'}`, 'Money received from business activities'],
+      ['Total Expenses', `$${summary.total_expenses?.toFixed(2) || '0.00'}`, 'Money spent on business operations'],
+      ['Net Profit/Loss', `$${summary.net_profit?.toFixed(2) || '0.00'}`, summary.net_profit >= 0 ? 'Business is profitable' : 'Business has losses'],
+      ['Total Transactions', `${summary.transaction_count || 0}`, 'Number of recorded transactions'],
+      ['Average Transaction', `$${summary.transaction_count > 0 ? ((summary.total_income + summary.total_expenses) / summary.transaction_count).toFixed(2) : '0.00'}`, 'Average transaction value']
     ];
     
     doc.autoTable({
-      startY: 55,
-      head: [['Metric', 'Amount']],
+      startY: 63,
+      head: [['Financial Metric', 'Amount', 'Description']],
       body: summaryData,
       theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 10 },
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontSize: 11,
+        fontStyle: 'bold'
+      },
+      styles: { 
+        fontSize: 10,
+        cellPadding: 4
+      },
+      columnStyles: {
+        0: { cellWidth: 50, fontStyle: 'bold' },
+        1: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
+        2: { cellWidth: 70 }
+      },
       margin: { left: 20, right: 20 }
     });
     
-    // Transactions Table
+    // Detailed Transaction History
     if (transactions.length > 0) {
-      doc.setFontSize(14);
+      doc.setFontSize(16);
       doc.setTextColor(40);
-      doc.text('Transaction Details', 20, doc.lastAutoTable.finalY + 20);
+      doc.text('📋 Detailed Transaction History', 20, doc.lastAutoTable.finalY + 20);
       
-      const transactionData = transactions.map(tx => [
+      // Prepare transaction data with enhanced information
+      const transactionData = transactions.map((tx, index) => [
+        `${index + 1}`, // Transaction number
         tx.date,
-        tx.type === 'income' ? 'Income' : 'Expense',
+        tx.created_at ? format(new Date(tx.created_at), 'MMM dd, HH:mm') : 'N/A',
+        tx.type === 'income' ? '📈 Income' : '📉 Expense',
         tx.description,
-        tx.category || 'N/A',
+        tx.category || 'Uncategorized',
         tx.type === 'income' ? `+$${tx.amount.toFixed(2)}` : `-$${tx.amount.toFixed(2)}`
       ]);
       
       doc.autoTable({
         startY: doc.lastAutoTable.finalY + 25,
-        head: [['Date', 'Type', 'Description', 'Category', 'Amount']],
+        head: [['#', 'Transaction Date', 'Added On', 'Type', 'Description', 'Category', 'Amount']],
         body: transactionData,
         theme: 'striped',
-        headStyles: { fillColor: [59, 130, 246] },
-        styles: { fontSize: 9 },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 60 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 30, halign: 'right' }
+        headStyles: { 
+          fillColor: [16, 185, 129],
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold'
         },
-        margin: { left: 20, right: 20 }
+        styles: { 
+          fontSize: 8,
+          cellPadding: 3
+        },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 50 },
+          5: { cellWidth: 25, halign: 'center' },
+          6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 20, right: 20 },
+        didParseCell: function (data) {
+          // Color code amounts
+          if (data.column.index === 6) {
+            if (data.cell.text[0].includes('+')) {
+              data.cell.styles.textColor = [16, 185, 129]; // Green for income
+            } else {
+              data.cell.styles.textColor = [239, 68, 68]; // Red for expenses
+            }
+          }
+        }
       });
+      
+      // Transaction Categories Summary
+      if (doc.lastAutoTable.finalY < doc.internal.pageSize.height - 100) {
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('📊 Category Breakdown', 20, doc.lastAutoTable.finalY + 20);
+        
+        // Calculate category totals
+        const categoryTotals = {};
+        transactions.forEach(tx => {
+          const category = tx.category || 'Uncategorized';
+          if (!categoryTotals[category]) {
+            categoryTotals[category] = { income: 0, expenses: 0, count: 0 };
+          }
+          categoryTotals[category].count++;
+          if (tx.type === 'income') {
+            categoryTotals[category].income += tx.amount;
+          } else {
+            categoryTotals[category].expenses += tx.amount;
+          }
+        });
+        
+        const categoryData = Object.entries(categoryTotals).map(([category, data]) => [
+          category,
+          `$${data.income.toFixed(2)}`,
+          `$${data.expenses.toFixed(2)}`,
+          `$${(data.income - data.expenses).toFixed(2)}`,
+          `${data.count}`
+        ]);
+        
+        doc.autoTable({
+          startY: doc.lastAutoTable.finalY + 25,
+          head: [['Category', 'Income', 'Expenses', 'Net', 'Count']],
+          body: categoryData,
+          theme: 'grid',
+          headStyles: { 
+            fillColor: [147, 51, 234],
+            textColor: 255,
+            fontSize: 10,
+            fontStyle: 'bold'
+          },
+          styles: { 
+            fontSize: 9,
+            cellPadding: 3
+          },
+          columnStyles: {
+            0: { cellWidth: 50, fontStyle: 'bold' },
+            1: { cellWidth: 30, halign: 'right', textColor: [16, 185, 129] },
+            2: { cellWidth: 30, halign: 'right', textColor: [239, 68, 68] },
+            3: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
+            4: { cellWidth: 20, halign: 'center' }
+          },
+          margin: { left: 20, right: 20 }
+        });
+      }
     }
     
-    // Footer
+    // Footer with page numbers and important notes
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      
+      // Page number
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text(
-        `Page ${i} of ${pageCount} | Generated on ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
-        20,
+        `Page ${i} of ${pageCount}`,
+        doc.internal.pageSize.width - 30,
         doc.internal.pageSize.height - 10
       );
+      
+      // Important note on first page
+      if (i === 1) {
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(
+          '⚠️ This report contains permanent transaction records. Keep for tax and accounting purposes.',
+          20,
+          doc.internal.pageSize.height - 20
+        );
+        doc.text(
+          `📧 Generated from Business Balance Sheet App | ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
+          20,
+          doc.internal.pageSize.height - 10
+        );
+      }
     }
     
-    // Save the PDF
-    const fileName = `balance-sheet-${startDate || 'all'}-${endDate || format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    // Generate filename with date range
+    const fileName = startDate && endDate 
+      ? `balance-sheet-${startDate}-to-${endDate}.pdf`
+      : startDate 
+      ? `balance-sheet-from-${startDate}.pdf`
+      : endDate 
+      ? `balance-sheet-until-${endDate}.pdf`
+      : `complete-balance-sheet-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    
     doc.save(fileName);
   };
 
   return (
-    <button
-      onClick={generatePDF}
-      className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors"
-    >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      Download PDF
-    </button>
+    <div className="flex items-center gap-3">
+      <button
+        onClick={generatePDF}
+        className="flex items-center gap-2 bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-md hover:shadow-lg"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Download Complete PDF Report
+      </button>
+      
+      <div className="text-sm text-gray-600">
+        <p>📄 Includes {transactions.length} transactions</p>
+        <p>💾 Permanent record with all details</p>
+      </div>
+    </div>
   );
 };
 
