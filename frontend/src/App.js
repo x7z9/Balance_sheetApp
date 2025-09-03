@@ -8,7 +8,177 @@ import 'jspdf-autotable';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Transaction Form Component
+// Pagination Component
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-center space-x-2 mt-6">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+      
+      {getPageNumbers().map((page, index) => (
+        <button
+          key={index}
+          onClick={() => typeof page === 'number' ? onPageChange(page) : null}
+          disabled={page === '...'}
+          className={`px-3 py-2 rounded-lg border ${
+            page === currentPage
+              ? 'bg-blue-600 text-white border-blue-600'
+              : page === '...'
+              ? 'border-gray-300 text-gray-400 cursor-default'
+              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
+    </div>
+  );
+};
+
+// PDF Download Component
+const PDFDownload = ({ transactions, summary, startDate, endDate }) => {
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(40);
+    doc.text('Business Balance Sheet Report', 20, 25);
+    
+    // Date range
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    const dateRange = startDate && endDate 
+      ? `Period: ${startDate} to ${endDate}`
+      : startDate 
+      ? `From: ${startDate}`
+      : endDate 
+      ? `Until: ${endDate}`
+      : `All Transactions (Generated: ${format(new Date(), 'yyyy-MM-dd')})`;
+    doc.text(dateRange, 20, 35);
+    
+    // Summary Section
+    doc.setFontSize(14);
+    doc.setTextColor(40);
+    doc.text('Financial Summary', 20, 50);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const summaryData = [
+      ['Total Income', `$${summary.total_income?.toFixed(2) || '0.00'}`],
+      ['Total Expenses', `$${summary.total_expenses?.toFixed(2) || '0.00'}`],
+      ['Net Profit/Loss', `$${summary.net_profit?.toFixed(2) || '0.00'}`],
+      ['Total Transactions', `${summary.transaction_count || 0}`]
+    ];
+    
+    doc.autoTable({
+      startY: 55,
+      head: [['Metric', 'Amount']],
+      body: summaryData,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246] },
+      styles: { fontSize: 10 },
+      margin: { left: 20, right: 20 }
+    });
+    
+    // Transactions Table
+    if (transactions.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text('Transaction Details', 20, doc.lastAutoTable.finalY + 20);
+      
+      const transactionData = transactions.map(tx => [
+        tx.date,
+        tx.type === 'income' ? 'Income' : 'Expense',
+        tx.description,
+        tx.category || 'N/A',
+        tx.type === 'income' ? `+$${tx.amount.toFixed(2)}` : `-$${tx.amount.toFixed(2)}`
+      ]);
+      
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 25,
+        head: [['Date', 'Type', 'Description', 'Category', 'Amount']],
+        body: transactionData,
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 9 },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 60 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 30, halign: 'right' }
+        },
+        margin: { left: 20, right: 20 }
+      });
+    }
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Page ${i} of ${pageCount} | Generated on ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
+        20,
+        doc.internal.pageSize.height - 10
+      );
+    }
+    
+    // Save the PDF
+    const fileName = `balance-sheet-${startDate || 'all'}-${endDate || format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    doc.save(fileName);
+  };
+
+  return (
+    <button
+      onClick={generatePDF}
+      className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      Download PDF
+    </button>
+  );
+};
 const TransactionForm = ({ onTransactionAdded }) => {
   const [formData, setFormData] = useState({
     type: 'income',
